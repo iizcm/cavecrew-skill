@@ -1,232 +1,61 @@
-# Cavecrew — Skill
+# cavecrew
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![Universal AI Agent Skill](https://img.shields.io/badge/Universal-AI_Agent_skill-orange)](#)
-[![Category: Productivity](https://img.shields.io/badge/Category-Productivity-purple)](#)
+Decision guide. When to delegate to caveman subagents instead of doing the work inline.
 
-| Field | Value |
-| --- | --- |
-| **Name** | `cavecrew-skill` |
-| **Description** | Decision guide for delegating to caveman-style subagents. Tells the main thread WHEN to spawn `cavecrew-investigator` (locate code), `cavecrew-builder` (1-2 file edit), or `cavecrew-reviewer` (diff review) instead of doing the work inline or using vanilla `Explore`. Subagent output is caveman-compressed so the tool-result injected back into main context is ~60% smaller — main context lasts longer across long sessions. Trigger: "delegate to subagent", "use cavecrew", "spawn investigator/builde... |
-| **Category** | productivity |
-| **Version** | `1.0.0` |
-| **Author** | Community |
-| **License** | MIT |
-| **Platforms** | Linux, macOS, Windows |
+## What it does
 
----
+Tells the main thread when to spawn a caveman-style subagent versus the vanilla equivalent. The win: subagent tool-results inject back into main context verbatim, and caveman output is roughly 1/3 the size of vanilla prose. Across 20 delegations in one session, that is the difference between context exhaustion and finishing the task.
 
-## What it is
+Three subagents:
 
-Decision guide for delegating to caveman-style subagents. Tells the main
-thread WHEN to spawn `cavecrew-investigator` (locate code), `cavecrew-builder`
-(1-2 file edit), or `cavecrew-reviewer` (diff review) instead of doing the
-work inline or using vanilla `Explore`. Subagent output is caveman-compressed
-so the tool-result injected back into main context is ~60% smaller — main
-context lasts longer across long sessions.
-Trigger: "delegate to subagent", "use cavecrew", "spawn investigator/builder/reviewer",
-"save context", "compressed agent output".
+| Subagent | Job | Use when |
+|----------|-----|----------|
+| `cavecrew-investigator` | Locate code (read-only) | "Where is X defined / what calls Y / list uses of Z" |
+| `cavecrew-builder` | Surgical edit, 1-2 files | Scope is obvious, ≤2 files. Refuses 3+ file scope. |
+| `cavecrew-reviewer` | Diff/file review | One-line findings with severity emoji |
 
-This is a universal AI agent skill — platform-agnostic and usable inside any modern agent runtime that supports the skill file format (`SKILL.md`). It provides focused capabilities with proper configuration, reproducible outputs, and safe defaults.
+Use vanilla `Explore` or `Code Reviewer` when you want prose, architecture commentary, or rationale. Use main thread directly for one-line answers and 3+ file refactors.
 
-**Important:** Use only on targets you own or have explicit permission to work with. Do not use for unauthorized system access, data scraping, or activities that violate applicable laws or terms of service.
+This skill is a decision guide, not a slash command. It activates when the conversation mentions delegation.
 
----
+## How to invoke
 
-## 🇬🇧 English
+Triggers on phrases like "delegate to subagent", "use cavecrew", "spawn investigator", "save context", "compressed agent output".
 
-### Requirements
+## Example chaining
 
-- A compatible AI agent runtime that supports skills (Hermes, OpenClaw, Claude Code, Codex, etc.)
-- Python 3.10+ for skills that delegate to scripts
-- Network access if the skill requires remote data fetching, API calls, or web scraping
-- Write permissions to your project/output folder
+Locate → fix → verify (most common):
 
-### Installation
+1. `cavecrew-investigator` returns site list (`path:line — symbol — note`)
+2. Main thread picks 1-2 sites, hands paths to `cavecrew-builder`
+3. `cavecrew-reviewer` audits the resulting diff
 
-```bash
-# Option A: Copy skill directory into your agent's skills folder
-cp -r productivity/cavecrew ~/.hermes/skills/productivity/cavecrew/
+Parallel scout: spawn 2-3 `cavecrew-investigator` calls in one message with different angles (defs, callers, tests). Aggregate in main.
 
-# Option B: Install directly from this repository's raw SKILL.md URL
-<agent-cli> skills install https://raw.githubusercontent.com/iizcm/cavecrew-skill/main/SKILL.md
+## Model overrides
 
-# Option C: Clone this entire repo into your skills directory
-git clone https://github.com/iizcm/cavecrew-skill.git ~/.hermes/skills/productivity/cavecrew/
+By default, `cavecrew-reviewer` and `cavecrew-investigator` pin `model: haiku` in their frontmatter; `cavecrew-builder` has no `model:` line (uses the API session default). Set env vars in your shell before launching Claude Code to override per-agent:
+
+| Env var | Agent |
+|---|---|
+| `CAVECREW_REVIEWER_MODEL` | `cavecrew-reviewer` |
+| `CAVECREW_BUILDER_MODEL` | `cavecrew-builder` |
+| `CAVECREW_INVESTIGATOR_MODEL` | `cavecrew-investigator` |
+
+Example — run reviewer on sonnet, keep others on default:
+
+```sh
+export CAVECREW_REVIEWER_MODEL=sonnet
 ```
 
-### Step-by-step usage
+Use the same model name strings you'd use in any Claude Code agent frontmatter (e.g. `haiku`, `sonnet`, `opus`).
 
-**Step 1** — Create a project folder:
+Overrides patch only the `model:` line in the installed agent's frontmatter; the prompt body is untouched and keeps receiving upstream updates. Plugin installs only — standalone hook installs have no local agent files to patch. Unset or blank = no change. The patch persists in the installed file until the plugin is updated or reinstalled.
 
-```bash
-mkdir -p ~/projects/example
-cd ~/projects/example
-```
+## See also
 
-**Step 2** — Load the skill into your agent:
-
-```text
-skill_view(name="productivity/cavecrew")
-```
-
-The exact command varies by runtime. Some agents auto-load skills by matching task descriptions; others require explicit loading commands.
-
-**Step 3** — Invoke a task with natural language:
-
-```text
-Use the cavecrew skill to <describe your specific task here>
-```
-
-Wrap your request as a clear, single-sentence instruction so the agent routes it to the right skill handler.
-
-**Step 4** — Inspect outputs:
-
-```bash
-ls -la out/
-cat out/*.log   # check logs
-```
-
-Most skills write outputs under an `out/` folder by default. Check logs, files, images, reports, and other artifacts there.
-
-**Step 5** — Customize for your workflow:
-
-- Edit the skill's `SKILL.md` frontmatter to change its name, tags, or trigger keywords
-- Modify default parameters inside the skill body for permanent behavior changes
-- Combine with other skills for compound automation (e.g., HTML generation + screenshot capture)
-
-### Troubleshooting
-
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| Skill not found / not loaded | Not installed in active skills directory | Re-run install command above |
-| Network timeout or API error | Internet blocked, proxy misconfigured, or rate-limited | Check connectivity; configure proxy if needed |
-| Permission denied on output folder | Folder not writable by current user | `chmod` or run from user-owned directory |
-| No output produced | Input format doesn't match expected format | Validate input against skill's documented format |
-| Script execution error | Missing dependency or wrong Python version | `pip install <deps>` listed in skill references |
-
-### Security & safety notes
-
-- Do **not** embed private keys, seed phrases, API tokens, wallet addresses, or personal data in outputs or chat logs
-- Placeholders in examples use `<YOUR_*>` notation — replace them before production use
-- Always validate/simulate outputs before acting on them, especially for write/destructive actions
-- This skill never stores credentials in plain text; use your runtime's secure credential store
-
----
-
-## 🇮🇩 Bahasa Indonesia
-
-### Persyaratan
-
-- Runtime AI agent yang mendukung format skill (Hermes, OpenClaw, Claude Code, Codex, dll.)
-- Python 3.10+ untuk skill yang menggunakan script eksternal
-- Koneksi internet jika skill perlu mengambil data dari luar (API, web scraping, download)
-- Izin tulis ke folder project/output Anda
-
-### Instalasi
-
-```bash
-# Opsi A: Salin folder skill ke direktori skills agent
-cp -r productivity/cavecrew ~/.hermes/skills/productivity/cavecrew/
-
-# Opsi B: Pasang langsung dari URL SKILL.md repo ini
-<agent-cli> skills install https://raw.githubusercontent.com/iizcm/cavecrew-skill/main/SKILL.md
-
-# Opsi C: Clone seluruh repo ini ke direktori skills
-git clone https://github.com/iizcm/cavecrew-skill.git ~/.hermes/skills/productivity/cavecrew/
-```
-
-### Langkah penggunaan
-
-**Langkah 1** — Buat folder proyek:
-
-```bash
-mkdir -p ~/projects/example
-cd ~/projects/example
-```
-
-**Langkah 2** — Muat skill ke dalam agent:
-
-```text
-skill_view(name="productivity/cavecrew")
-```
-
-Perintah tepat bergantung runtime. Beberapa agent otomatis-muat skill berdasarkan deskripsi tugas; lainnya perlu perintah eksplisit.
-
-**Langkah 3** — Panggil tugas dengan bahasa alami:
-
-```text
-Gunakan skill cavecrew untuk <deskripsikan tugas spesifik Anda di sini>
-```
-
-Bungkus permintaan sebagai satu kalimat yang jelas agar agent merutekannya ke handler skill yang benar.
-
-**Langkah 4** — Periksa hasil:
-
-```bash
-ls -la out/
-cat out/*.log   # cek log
-```
-
-Kebanyakan skill menulis output di bawah folder `out/`. Cek log, file, gambar, laporan, dan artefak lain di sana.
-
-**Langkah 5** — Sesuaikan untuk alur kerja Anda:
-
-- Edit frontmatter `SKILL.md` untuk ganti nama, tag, atau kata kunci pemicu
-- Ubah parameter default di dalam body skill untuk perubahan perilaku permanen
-- Gabungkan dengan skill lain untuk otomasi compound (misal: generate HTML + screenshot)
-
-### Troubleshooting (ID)
-
-| Gejala | Kemungkinan penyebab | Solusi |
-| --- | --- | --- |
-| Skill tidak ditemukan | Belum terpasang di direktori skills aktif | Jalankan ulang perintah instalasi |
-| Timeout / error API | Terblokir, proxy salah, atau rate limit | Cek koneksi; atur proxy jika perlu |
-| Permission ditolak | Folder output tidak bisa ditulis | `chmod` atau jalankan dari folder milik user |
-| Tidak ada output | Format input tidak sesuai | Sesuaikan input dengan format yang didokumentasikan |
-| Error eksekusi script | Dependency kurang atau versi Python salah | `pip install <deps>` yang tercantum di referensi skill |
-
-### Keamanan
-
-- **Jangan** masukkan private key, mnemonic, token API, alamat wallet, atau data pribadi ke output atau chat log
-- Contoh di dokumentasi menggunakan format `<YOUR_*>` — ganti sebelum dipakai di produksi
-- Selalu validasi/simulasikan output sebelum digunakan, terutama untuk aksi destruktif/tulis
-- Skill ini tidak menyimpan kredensial dalam plain text; gunakan penyimpanan kredensial aman runtime Anda
-
----
-
-## Repository structure
-
-```
-cavecrew-skill/
-├── README.md              ← This file (bilingual documentation)
-├── SKILL.md               ← Skill definition (frontmatter + usage)
-├── references/            ← Reference docs, guides, checklists
-│   ├── *.md
-│   └── ...
-├── scripts/               ← Executable scripts (Python, JS, Bash)
-│   ├── *.py
-│   ├── *.js
-│   └── *.sh
-├── templates/             ← Template files (if applicable)
-│   └── ...
-└── assets/                ← Static assets (if applicable)
-    └── ...
-```
-
-All files from the original skill directory are included in this repository.
-
----
-
-## Notes
-
-- Update this README when the skill's interface, options, or behavior changes
-- If you fork this repo, keep the MIT license and attribution intact
-- Report bugs or suggest improvements via GitHub Issues on the original repo
-- For questions about usage, refer to the `SKILL.md` file or the `references/` directory
-
----
-
-## License
-
-MIT — free to use, modify, and distribute.
+- [`SKILL.md`](./SKILL.md) — full decision matrix and output contracts
+- [`agents/cavecrew-investigator.md`](../../agents/cavecrew-investigator.md)
+- [`agents/cavecrew-builder.md`](../../agents/cavecrew-builder.md)
+- [`agents/cavecrew-reviewer.md`](../../agents/cavecrew-reviewer.md)
+- [Caveman README](../../README.md) — repo overview
